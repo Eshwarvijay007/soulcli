@@ -4,10 +4,22 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from llm_client import LlmClient, tag_emotion
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
 app = FastAPI()
+
+# Allow local CLI to call the API during dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Single client instance
 client = LlmClient()
 
 class Query(BaseModel):
@@ -15,11 +27,12 @@ class Query(BaseModel):
     history: List[str] = []
 
 @app.get("/health")
-def health():
+async def health():
     return {"ok": True}
 
 @app.post("/query")
 async def query_llm(q: Query):
+    # Delegates to client; returns text + emotion tag
     result = await client.chat(q.input, q.history)
     text = (result.get("text") or "").strip()
     emotion = tag_emotion(text)
