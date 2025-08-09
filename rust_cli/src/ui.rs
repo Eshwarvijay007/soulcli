@@ -12,6 +12,13 @@ use ratatui::{
 #[derive(Clone, Copy)]
 pub enum Emotion { Neutral, Happy, Sad, Alert }
 
+pub enum UiEvent {
+    Llm { text: String, emotion: String },
+    Stdout(String),
+    Stderr(String),
+    Status(String),
+}
+
 pub struct Message { pub text: String, pub emotion: Emotion }
 
 pub struct UiState {
@@ -29,7 +36,7 @@ impl UiState {
 }
 
 pub fn run_loop<F, MapEmo>(
-    rx: Receiver<(String, String)>,
+    rx: Receiver<UiEvent>,
     mut on_submit: F,
     mut map_emotion: MapEmo,
 ) -> anyhow::Result<()>
@@ -49,11 +56,25 @@ where
 
     loop {
         // 1) Pull any backend replies (non-blocking) and update state
-        while let Ok((text, emo_str)) = rx.try_recv() {
-            state.typing = false;
-            state.mood = map_emotion(&emo_str);
-            state.messages.push(Message { text, emotion: state.mood });
+        while let Ok(ev) = rx.try_recv() {
+            match ev {
+                UiEvent::Llm { text, emotion } => {
+                    state.typing = false;                 // stop LLM spinner only
+                    state.mood = map_emotion(&emotion);
+                    state.messages.push(Message { text, emotion: state.mood });
+                }
+                UiEvent::Stdout(line) => {
+                    state.messages.push(Message { text: line, emotion: Emotion::Neutral });
+                }
+                UiEvent::Stderr(line) => {
+                    state.messages.push(Message { text: line, emotion: Emotion::Alert });
+                }
+                UiEvent::Status(line) => {
+                    state.messages.push(Message { text: line, emotion: Emotion::Neutral });
+                }
+            }
         }
+        
 
         // 2) Draw UI
         terminal.draw(|f| {
