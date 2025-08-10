@@ -125,11 +125,13 @@ fn main() -> anyhow::Result<()> {
                 let tx_shell = tx.clone(); // clone sender for shell task
                 let rt_sh = rt.clone();
                 let cmd = line.clone();
+                let api_url_shell = api_url.clone();
+                let hist_shell = hist.items.clone();
 
                 rt_sh.spawn(async move {
                     // pass a dedicated clone into the streaming function
                     let tx_for_run = tx_shell.clone();
-                    if let Err(e) = run_shell_and_stream(&cmd, tx_for_run).await {
+                    if let Err(e) = run_shell_and_stream(&cmd, tx_for_run, api_url_shell, hist_shell).await {
                         // use the original clone for error reporting
                         let _ = tx_shell.send(UiEvent::Stderr(format!("shell error: {}", e)));
                     }
