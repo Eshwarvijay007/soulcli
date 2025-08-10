@@ -1,13 +1,13 @@
-# SoulCLI - A Terminal with a Soul 🧠
+# KarriCLI - A Terminal with a Karri 🧠
 
-![SoulCLI Startup Screen](assets/banner.png)
-![SoulShell Command Example](./assets/demo.png)
+![KarriCLI Startup Screen](assets/banner.png)
+![KarriShell Command Example](./assets/demo.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust Version](https://img.shields.io/badge/rust-1.78%2B-orange.svg)](https://www.rust-lang.org/)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-**SoulCLI (aka.SoulShell) is a next-generation command-line interface that fuses the robustness of a traditional shell with the cognitive power of large language models. It's engineered to be an intelligent and empathetic partner for developers, offering contextual assistance, command analysis, and a touch of personality.**
+**KarriCLI (aka.KarriShell) is a next-generation command-line interface that fuses the robustness of a traditional shell with the cognitive power of large language models. It's engineered to be an intelligent and empathetic partner for developers, offering contextual assistance, command analysis, and a touch of personality.**
 
 *Created by **Eshwar Vijay***
 
@@ -23,7 +23,7 @@
 
 ## 🏛️ Architecture
 
-SoulCLI is composed of two main services that communicate over HTTP:
+KarriCLI is composed of two main services that communicate over HTTP:
 
 1.  **Rust CLI (Frontend)**: The user-facing application that you interact with in your terminal.
 2.  **Python API (Backend)**: A `fastapi` server that acts as a bridge to the Gemini LLM.
@@ -37,7 +37,7 @@ graph TB
     end
     
     subgraph "Frontend Layer"
-        CLI["🦀 Rust CLI - SoulShell<br/>• ratatui TUI<br/>• crossterm events<br/>• tokio async runtime<br/>• Command execution"]
+        CLI["🦀 Rust CLI - KarriShell<br/>• ratatui TUI<br/>• crossterm events<br/>• tokio async runtime<br/>• Command execution"]
     end
     
     subgraph "Backend Layer"
@@ -77,7 +77,7 @@ sequenceDiagram
     
     autonumber
     
-    Note over U,LLM: SoulCLI Interaction Flow
+    Note over U,LLM: KarriCLI Interaction Flow
     
     U->>+CLI: Command Input
     CLI->>CLI: Parse & Validate
@@ -167,7 +167,7 @@ The backend is a lightweight and high-performance `fastapi` application:
 
 ## ⚙️ Installation and Setup
 
-Follow these steps to get SoulCLI up and running on your local machine.
+Follow these steps to get KarriCLI up and running on your local machine.
 
 ### 1. Prerequisites
 
@@ -181,7 +181,7 @@ Make sure you have the following installed:
 
 ```bash
 git clone <repository_url>
-cd soulcli
+cd Karricli
 ```
 
 ### 3. Set up the Python Backend
@@ -221,13 +221,13 @@ This will start the Python API server in the background and the Rust CLI in the 
 
 ## 📖 Usage
 
-Once SoulCLI is running, you can use it like a standard shell. Here are some of the things you can do:
+Once KarriCLI is running, you can use it like a standard shell. Here are some of the things you can do:
 
 *   **Run any shell command**: `ls -l`, `git status`, `docker ps`, etc.
 *   **Ask a question**: `what is the capital of France?`
 *   **Get an explanation of the previous command's output**: `explain the output of the last command`
 *   **Cancel a running command**: Press the `x` key.
-*   **Exit SoulCLI**: Press the `Esc` key.
+*   **Exit KarriCLI**: Press the `Esc` key.
 
 ## 🌐 API Endpoints
 
