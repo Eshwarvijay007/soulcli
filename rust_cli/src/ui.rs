@@ -132,21 +132,27 @@ where
                     latest_len += 1;
                 }
 
-                // Separator before older history
-                lines.push(Line::from(Span::styled("──────── previous ────────", Style::default().fg(Color::DarkGray))));
+                // Separator + older history only if there is a previous command
+                let has_prev_command = idx > 0 && state.messages[..idx]
+                    .iter()
+                    .any(|m| m.text.starts_with("$ "));
+                if has_prev_command {
+                    // Separator before older history
+                    lines.push(Line::from(Span::styled("──────── previous ────────", Style::default().fg(Color::DarkGray))));
 
-                // Older history (newest-first), dimmed
-                for m in state.messages[..idx].iter().rev() {
-                    let mut style = match m.emotion {
-                        Emotion::Neutral => Style::default().fg(Color::Gray),
-                        Emotion::Happy => Style::default().fg(Color::Green),
-                        Emotion::Sad    => Style::default().fg(Color::Blue),
-                        Emotion::Alert  => Style::default().fg(Color::Red),
-                    }.add_modifier(Modifier::DIM);
-                    if m.text.starts_with("$ ") {
-                        style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::DIM);
+                    // Older history (newest-first), dimmed
+                    for m in state.messages[..idx].iter().rev() {
+                        let mut style = match m.emotion {
+                            Emotion::Neutral => Style::default().fg(Color::Gray),
+                            Emotion::Happy => Style::default().fg(Color::Green),
+                            Emotion::Sad    => Style::default().fg(Color::Blue),
+                            Emotion::Alert  => Style::default().fg(Color::Red),
+                        }.add_modifier(Modifier::DIM);
+                        if m.text.starts_with("$ ") {
+                            style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::DIM);
+                        }
+                        lines.push(Line::from(Span::styled(m.text.clone(), style)));
                     }
-                    lines.push(Line::from(Span::styled(m.text.clone(), style)));
                 }
             } else {
                 // No commands yet: default to newest-first view
