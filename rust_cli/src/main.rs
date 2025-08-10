@@ -128,6 +128,6 @@ fn print_welcome_banner() {
     println!("3. Use {orange}{bold}:help{reset} for commands, or {orange}{bold}:clear{reset} to reset the view.");
     println!("4. History is saved to {orange}{bold}history.txt{reset} (recent items only).");
     println!();
-    println!("{dim}SoulCLI v{version} - Powered by Rust{reset}");
+    println!("{dim}SoulCLI v{version} - Terminal with a Soul{reset}");
     println!();
 }

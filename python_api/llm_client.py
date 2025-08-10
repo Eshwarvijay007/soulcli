@@ -1,39 +1,46 @@
+# python_api/llm_client.py
 import os
 import httpx
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # put your key in .env
+MODEL = os.getenv("GEMINI_MODEL", "models/gemini-1.5-flash")
+
 class LlmClient:
-    def __init__(self):
-        self.mode = os.getenv("LLM_MODE", "chat_completions")
-        self.gemini_key = os.getenv("GEMINI_API_KEY")
-        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-pro")
+    async def chat(self, prompt: str, history):
+        return await self._chat_gemini_http(prompt, history or [])
 
-    async def chat(self, prompt: str, history: list[str]):
-        if self.mode == "gemini_http":
-            return await self._chat_gemini_http(prompt, history)
-        # ... other modes (openai, ollama, etc.) ...
+    async def _chat_gemini_http(self, prompt: str, history):
+        if not GEMINI_API_KEY:
+            raise RuntimeError("GEMINI_API_KEY not set")
 
-    async def _chat_gemini_http(self, prompt: str, history: list[str]):
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent?key={self.gemini_key}"
-        # Merge history + current prompt
-        combined_text = "\n".join(history[-8:] + [prompt])
-        payload = {
-            "contents": [
-                {"parts": [{"text": combined_text}]}
-            ]
-        }
-        async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.post(url, json=payload)
-            r.raise_for_status()
+        # Map history strings to Gemini "contents"
+        contents = []
+        for h in history[-10:]:
+            contents.append({"role": "user", "parts": [{"text": h}]})
+        contents.append({"role": "user", "parts": [{"text": prompt}]})
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/{MODEL}:generateContent?key={GEMINI_API_KEY}"
+        payload = { "contents": contents }
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+            try:
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                # log full body for clues (key restrictions, quota, etc.)
+                raise httpx.HTTPStatusError(f"{e} | body={r.text}", request=e.request, response=e.response)
             data = r.json()
-
-        # Extract text from Gemini response
-        try:
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-        except KeyError:
-            text = str(data)
-        return {"text": text}
-
+            text = ""
+            for cand in (data.get("candidates") or []):
+                parts = ((cand.get("content") or {}).get("parts") or [])
+                for p in parts:
+                    text += p.get("text", "")
+            return {"text": text or "(no text)"}
 
 def tag_emotion(text: str) -> str:
-    # TODO: Implement actual emotion tagging
+    t = (text or "").lower()
+    if "error" in t or "fail" in t:
+        return "alert"
+    if "great" in t or "awesome" in t:
+        return "happy"
     return "neutral"
