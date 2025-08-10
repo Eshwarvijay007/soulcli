@@ -4,7 +4,7 @@ use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     backend::CrosstermBackend, Terminal,
     layout::{Layout, Constraint, Direction},
-    widgets::{Block, Borders, Paragraph, Wrap, Gauge, Clear},
+    widgets::{Block, Borders, Paragraph, Wrap, Clear},
     style::{Style, Color},
     text::{Span, Line},
 };
@@ -124,16 +124,7 @@ where
             let y = chunks[2].y + 1;
             f.set_cursor(x, y);
 
-            // Mood pulse gauge over header
-            let ratio = ((frame % 100) as f64 / 100.0) as f64;
-            let color = match state.mood {
-                Emotion::Neutral => Color::Gray,
-                Emotion::Happy => Color::Green,
-                Emotion::Sad    => Color::Blue,
-                Emotion::Alert  => Color::Red,
-            };
-            let gauge = Gauge::default().gauge_style(Style::default().fg(color)).ratio(ratio);
-            f.render_widget(gauge, chunks[0]);
+            // Removed top loading/mood gauge bar
         })?;
 
         frame += 1;
