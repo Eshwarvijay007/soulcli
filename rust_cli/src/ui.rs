@@ -15,6 +15,8 @@ pub enum Emotion { Neutral, Happy, Sad, Alert }
 
 pub enum UiEvent {
     Llm { text: String, emotion: String },
+    LlmChunk { id: u64, text: String },
+    LlmDone { id: u64, emotion: String },
     Stdout(String),
     Stderr(String),
     Status(String),
@@ -27,6 +29,7 @@ pub struct Message {
     pub text: String,
     pub emotion: Emotion,
     pub origin: MessageOrigin,
+    pub conversation_id: u64,
 }
 
 pub struct UiState {
@@ -139,16 +142,29 @@ where
                     state.pending_llm = state.pending_llm.saturating_sub(1);
                     state.typing = state.pending_llm > 0; // keep spinner if other LLMs pending
                     state.mood = map_emotion(&emotion);
-                    state.messages.push(Message { text, emotion: state.mood, origin: MessageOrigin::Llm });
+                    state.messages.push(Message { text, emotion: state.mood, origin: MessageOrigin::Llm, conversation_id: 0 });
+                }
+                UiEvent::LlmChunk { id, text } => {
+                    // Append chunk to current LLM message for this conversation, or create it
+                    if let Some(pos) = state.messages.iter().rposition(|m| matches!(m.origin, MessageOrigin::Llm) && m.conversation_id == id) {
+                        state.messages[pos].text.push_str(&text);
+                    } else {
+                        state.messages.push(Message { text, emotion: Emotion::Neutral, origin: MessageOrigin::Llm, conversation_id: id });
+                    }
+                }
+                UiEvent::LlmDone { id: _, emotion } => {
+                    state.pending_llm = state.pending_llm.saturating_sub(1);
+                    state.typing = state.pending_llm > 0;
+                    state.mood = map_emotion(&emotion);
                 }
                 UiEvent::Stdout(line) => {
-                    state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Stdout });
+                    state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Stdout, conversation_id: 0 });
                 }
                 UiEvent::Stderr(line) => {
-                    state.messages.push(Message { text: line, emotion: Emotion::Alert, origin: MessageOrigin::Stderr });
+                    state.messages.push(Message { text: line, emotion: Emotion::Alert, origin: MessageOrigin::Stderr, conversation_id: 0 });
                 }
                 UiEvent::Status(line) => {
-                    state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Status });
+                    state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Status, conversation_id: 0 });
                 }
             }
         }
@@ -247,7 +263,7 @@ where
                     KeyCode::Enter => {
                         let line = std::mem::take(&mut state.input);
                         // Echo user command and show spinner
-                        state.messages.push(Message { text: format!("$ {}", line), emotion: Emotion::Neutral, origin: MessageOrigin::UserCommand });
+                        state.messages.push(Message { text: format!("$ {}", line), emotion: Emotion::Neutral, origin: MessageOrigin::UserCommand, conversation_id: 0 });
                         state.typing = true;
                         state.pending_llm = state.pending_llm.saturating_add(1);
                         state.scroll = 0; // anchor to latest group bottom

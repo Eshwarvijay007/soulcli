@@ -64,21 +64,30 @@ fn main() -> anyhow::Result<()> {
                 let tx_llm = tx.clone(); // clone sender for this task
                 let rt_llm = rt.clone();
                 let line_for_llm = line.clone();
+                let conv_id: u64 = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos() as u64;
 
                 rt_llm.spawn(async move {
                     match api_client::send_query(&api_url, &line_for_llm, hist_vec).await {
                         Ok(resp) => {
+                            let text = resp.text;
                             let emo = resp.emotion.unwrap_or_else(|| "neutral".into());
-                            let _ = tx_llm.send(UiEvent::Llm {
-                                text: resp.text,
-                                emotion: emo,
-                            });
+                            let chunk_size = 48usize;
+                            let mut i = 0usize;
+                            while i < text.len() {
+                                let end = (i + chunk_size).min(text.len());
+                                let part = text[i..end].to_string();
+                                let _ = tx_llm.send(UiEvent::LlmChunk { id: conv_id, text: part });
+                                i = end;
+                                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                            }
+                            let _ = tx_llm.send(UiEvent::LlmDone { id: conv_id, emotion: emo });
                         }
                         Err(e) => {
-                            let _ = tx_llm.send(UiEvent::Llm {
-                                text: format!("LLM error: {}", e),
-                                emotion: "alert".into(),
-                            });
+                            let _ = tx_llm.send(UiEvent::LlmChunk { id: conv_id, text: format!("LLM error: {}", e) });
+                            let _ = tx_llm.send(UiEvent::LlmDone { id: conv_id, emotion: "alert".into() });
                         }
                     }
                 });
