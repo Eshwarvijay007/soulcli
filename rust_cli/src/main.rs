@@ -26,6 +26,8 @@ fn map_emotion(s: &str) -> Emotion {
 fn main() -> anyhow::Result<()> {
     // Print big gradient banner + tips, Rust-style
     print_welcome_banner();
+    // Keep banner visible before switching to alternate screen with a small indicator
+    show_startup_indicator(7);
 
     let api_url = std::env::var("SOULSHELL_API_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:8000".into());
@@ -139,4 +141,35 @@ fn print_welcome_banner() {
     println!();
     println!("{dim}SoulCLI v{version} - Terminal with a Soul{reset}");
     println!();
+}
+
+fn show_startup_indicator(seconds: u64) {
+    use std::io::Write;
+    use std::time::{Duration, Instant};
+
+    let green = "\x1b[32m";      // green
+    let white = "\x1b[97m";      // bright white
+    let reset = "\x1b[0m";       // reset
+    let msg = "Building your terminal";
+
+    let start = Instant::now();
+    let mut tick: u32 = 0;
+    while start.elapsed() < Duration::from_secs(seconds) {
+        let active = (tick % 3) as usize; // which circle glows
+        let mut circles = String::new();
+        for i in 0..3 {
+            if i == active {
+                circles.push_str(&format!("{green}●{reset}"));
+            } else {
+                circles.push_str(&format!("{white}○{reset}"));
+            }
+            if i < 2 { circles.push(' '); }
+        }
+        // Clear line, carriage return; circles at far left, then message
+        print!("\r\x1b[2K{}  {}…", circles, msg);
+        let _ = std::io::stdout().flush();
+        std::thread::sleep(Duration::from_millis(250));
+        tick = tick.wrapping_add(1);
+    }
+    println!("");
 }
