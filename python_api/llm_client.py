@@ -2,7 +2,6 @@
 import os
 import httpx
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # put your key in .env
 MODEL = os.getenv("GEMINI_MODEL", "models/gemini-1.5-flash")
 
 class LlmClient:
@@ -10,7 +9,8 @@ class LlmClient:
         return await self._chat_gemini_http(prompt, history or [])
 
     async def _chat_gemini_http(self, prompt: str, history):
-        if not GEMINI_API_KEY:
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY not set")
 
         # Map history strings to Gemini "contents"
@@ -19,7 +19,7 @@ class LlmClient:
             contents.append({"role": "user", "parts": [{"text": h}]})
         contents.append({"role": "user", "parts": [{"text": prompt}]})
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/{MODEL}:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/{MODEL}:generateContent?key={gemini_api_key}"
         payload = { "contents": contents }
 
         async with httpx.AsyncClient(timeout=30) as client:
