@@ -7,7 +7,7 @@
 [![Rust Version](https://img.shields.io/badge/rust-1.78%2B-orange.svg)](https://www.rust-lang.org/)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-**SoulCLI is a next-generation command-line interface that fuses the robustness of a traditional shell with the cognitive power of large language models. It's engineered to be an intelligent and empathetic partner for developers, offering contextual assistance, command analysis, and a touch of personality.**
+**SoulCLI (aka.SoulShell) is a next-generation command-line interface that fuses the robustness of a traditional shell with the cognitive power of large language models. It's engineered to be an intelligent and empathetic partner for developers, offering contextual assistance, command analysis, and a touch of personality.**
 
 *Created by **Eshwar Vijay***
 
