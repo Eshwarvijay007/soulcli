@@ -1,7 +1,7 @@
 # SoulCLI - A Terminal with a Soul 🧠
 
-![SoulCLI Startup Screen](assets/banner.png.png)
-![SoulShell Command Example](./assets/demo.png.png)
+![SoulCLI Startup Screen](assets/banner.png)
+![SoulShell Command Example](./assets/demo.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust Version](https://img.shields.io/badge/rust-1.78%2B-orange.svg)](https://www.rust-lang.org/)
