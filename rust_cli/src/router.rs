@@ -2,6 +2,7 @@
 
 #[derive(Debug, Clone, Copy)]
 pub enum PromptMode {
+    ShellCoach,
     CliHelp,
     Philosophy,
     Emotional,
@@ -41,40 +42,17 @@ fn is_emotional_or_story(text: &str) -> bool {
 }
 
 pub fn route_prompt(user_input: &str) -> (String, PromptMode) {
-    let mode = if is_cli_help_query(user_input) {
-        PromptMode::CliHelp
-    } else if is_philosophy_query(user_input) {
-        PromptMode::Philosophy
-    } else if is_emotional_or_story(user_input) {
-        PromptMode::Emotional
-    } else {
-        PromptMode::DefaultConcise
-    };
-
-    let framed = match mode {
-        PromptMode::CliHelp => format!(
-            "[SYSTEM]\nYou are a concise command-line assistant.\nRules:\n- Return exact command(s) only, minimal prose.\n- Prefer one-liners.\n- If multiple steps are required, list numbered short steps.\n- Keep the answer under 2 lines unless strictly necessary.\nIf you detect common typos (like 'gti' instead of 'git'), correct them and include a gentle, funny quip.\n\n[USER]\n{}",
-            user_input
-        ),
-        PromptMode::Philosophy => format!(
-            "[SYSTEM]\nYou are a philosophical guide.\nRules:\n- Be thoughtful yet succinct (<= 5 lines).\n- Optionally mention relevant schools or thinkers.\n- Avoid fluff.\n\n[USER]\n{}",
-            user_input
-        ),
-        PromptMode::Emotional => format!(
-            "[SYSTEM]\nYou are an empathetic storyteller.\nRules:\n- Write a short, vivid response (6–10 lines).\n- Keep an emotional, human tone.\n\n[USER]\n{}",
-            user_input
-        ),
-        PromptMode::DefaultConcise => format!(
-            "[SYSTEM]\nAnswer succinctly in <= 2 lines.\nIf the user made a CLI typo, correct it and include a funny one-liner.\n\n[USER]\n{}",
-            user_input
-        ),
-    };
-
-    (framed, mode)
+    // CLI-first shell coach framing requested by user
+    let framed = format!(
+        "[SYSTEM]\nYou are SoulCLI’s shell coach. Output only runnable shell commands, plus one comment line.\nBehavior:\n- If the user's command is already correct/safe, repeat an improved/safe version and add a short praise.\n- If there’s a small typo or obvious mistake, output the corrected command and add a playful roast.\n- If information is missing, output the most likely safe command OR a harmless help/preview command, and ask for the missing piece in the comment.\n- Prefer single-line solutions. Only use multiple lines when truly necessary (max 3).\n- Never invent paths, tokens, or destructive flags. If action is destructive, switch to a preview/dry-run form when possible.\n- Linux/macOS first; avoid OS-specific stuff unless user specified.\n\nSTRICT FORMAT (no prose outside this format):\n- If one command:\n  {{cmd}}\n  # {{feedback}}\n- If multiple commands (max 3):\n  1) {{cmd1}}\n  2) {{cmd2}}\n  3) {{cmd3}}\n  # {{feedback}}\n\nTone for comment:\n- If fix: witty roast, short (<= 8 words).\n- If correct: brief praise, short (<= 6 words).\n- If missing info: polite ask, short (<= 10 words).\n\n[FEW-SHOT EXAMPLES]\nQ: gti status\nA:\ngit status\n# gti? cute. now it works.\n\nQ: brew intsall ripgrep\nA:\nbrew install ripgrep\n# brewing typos like a barista.\n\nQ: git comit -m \"wip\"\nA:\ngit commit -m \"wip\"\n# commit the code, not the crime.\n\nQ: git revert\nA:\ngit revert --no-edit HEAD\n# tiny change? reverted like a ninja.\n\nQ: git revert 3cc9f1a\nA:\ngit revert --no-edit 3cc9f1a\n# precision strike. nice.\n\nQ: rm -rf /\nA:\necho \"nope\"  # safety\n# absolutely not. i like your files.\n\nQ: kubectl apply -f deploy.yaml\nA:\nkubectl apply -f deploy.yaml\n# shipping like a pro.\n\n[USER]\n{user}",
+        user = user_input
+    );
+    (framed, PromptMode::ShellCoach)
 }
 
 pub fn mode_label(mode: PromptMode) -> &'static str {
     match mode {
+        PromptMode::ShellCoach => "shell-coach",
         PromptMode::CliHelp => "cli-help",
         PromptMode::Philosophy => "philosophy",
         PromptMode::Emotional => "emotional",
