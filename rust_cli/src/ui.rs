@@ -9,6 +9,7 @@ use ratatui::{
     text::{Span, Line},
 };
 use unicode_width::UnicodeWidthStr;
+use tokio::sync::oneshot;
 
 #[derive(Clone, Copy)]
 pub enum Emotion { Neutral, Happy, Sad, Alert }
@@ -20,6 +21,8 @@ pub enum UiEvent {
     Stdout(String),
     Stderr(String),
     Status(String),
+    RegisterCancel(oneshot::Sender<()>),
+    ClearCancel,
 }
 
 #[derive(Clone, Copy)]
@@ -39,6 +42,7 @@ pub struct UiState {
     pending_llm: u32,
     mood: Emotion,
     scroll: u16,
+    cancel_sender: Option<oneshot::Sender<()>>, // active process cancel
 }
 
 impl UiState {
@@ -50,6 +54,7 @@ impl UiState {
             pending_llm: 0,
             mood: Emotion::Neutral,
             scroll: 0,
+            cancel_sender: None,
         }
     }
 }
@@ -166,6 +171,12 @@ where
                 UiEvent::Status(line) => {
                     state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Status, conversation_id: 0 });
                 }
+                UiEvent::RegisterCancel(tx_cancel) => {
+                    state.cancel_sender = Some(tx_cancel);
+                }
+                UiEvent::ClearCancel => {
+                    state.cancel_sender = None;
+                }
             }
         }
         
@@ -179,10 +190,17 @@ where
                 .split(size);
 
             // Header
-            let header = Paragraph::new(Line::from(vec![
+            let mut header_spans = vec![
                 Span::styled(" 🧠 SoulShell ", Style::default().fg(Color::Cyan)),
-                Span::raw("— a terminal with feelings"),
-            ])).block(Block::default().borders(Borders::ALL));
+                Span::raw("— a terminal with feelings "),
+            ];
+            if state.cancel_sender.is_some() {
+                header_spans.push(Span::styled("[", Style::default().fg(Color::DarkGray)));
+                header_spans.push(Span::styled("X", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+                header_spans.push(Span::styled("] press x to cancel", Style::default().fg(Color::DarkGray)));
+            }
+            let header = Paragraph::new(Line::from(header_spans))
+                .block(Block::default().borders(Borders::ALL));
             f.render_widget(header, chunks[0]);
 
             // Messages: latest conversation first (top), older history below
@@ -270,6 +288,12 @@ where
                         on_submit(line); // no borrowing of state inside the callback
                     }
                     KeyCode::Esc => break,
+                    KeyCode::Char('x') => {
+                        if let Some(tx) = state.cancel_sender.take() {
+                            let _ = tx.send(());
+                            state.messages.push(Message { text: "↯ canceled current process".into(), emotion: Emotion::Alert, origin: MessageOrigin::Status, conversation_id: 0 });
+                        }
+                    }
                     KeyCode::Up => state.scroll = state.scroll.saturating_add(1),
                     KeyCode::Down => state.scroll = state.scroll.saturating_sub(1),
                     KeyCode::PageUp => state.scroll = state.scroll.saturating_add(5),
