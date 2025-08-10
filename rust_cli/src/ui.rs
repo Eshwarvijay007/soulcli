@@ -8,6 +8,7 @@ use ratatui::{
     style::{Style, Color, Modifier},
     text::{Span, Line},
 };
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Clone, Copy)]
 pub enum Emotion { Neutral, Happy, Sad, Alert }
@@ -19,7 +20,14 @@ pub enum UiEvent {
     Status(String),
 }
 
-pub struct Message { pub text: String, pub emotion: Emotion }
+#[derive(Clone, Copy)]
+pub enum MessageOrigin { UserCommand, Llm, Stdout, Stderr, Status }
+
+pub struct Message {
+    pub text: String,
+    pub emotion: Emotion,
+    pub origin: MessageOrigin,
+}
 
 pub struct UiState {
     input: String,
@@ -41,6 +49,67 @@ impl UiState {
             scroll: 0,
         }
     }
+}
+
+fn emotion_color(emotion: Emotion) -> Color {
+    match emotion {
+        Emotion::Neutral => Color::Gray,
+        Emotion::Happy => Color::Green,
+        Emotion::Sad => Color::Blue,
+        Emotion::Alert => Color::Red,
+    }
+}
+
+fn lerp(a: u8, b: u8, t: f32) -> u8 {
+    (a as f32 + (b as f32 - a as f32) * t).round() as u8
+}
+
+fn gradient_color(t: f32) -> Color {
+    // Simple purple → cyan gradient
+    let r = lerp(180, 0, t);
+    let g = lerp(0, 255, t);
+    let b = lerp(255, 255, t);
+    Color::Rgb(r, g, b)
+}
+
+fn gradient_spans(text: &str, dim: bool) -> Vec<Span<'static>> {
+    let mut spans: Vec<Span<'static>> = Vec::with_capacity(text.len().max(1));
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len().max(1);
+    for (i, ch) in chars.into_iter().enumerate() {
+        let t = if len <= 1 { 0.0 } else { i as f32 / (len.saturating_sub(1) as f32) };
+        let color = gradient_color(t);
+        let mut style = Style::default().fg(color);
+        if dim { style = style.add_modifier(Modifier::DIM); }
+        spans.push(Span::styled(ch.to_string(), style));
+    }
+    spans
+}
+
+fn render_message_line(msg: &Message, dim: bool) -> Line<'static> {
+    match msg.origin {
+        MessageOrigin::Llm => Line::from(gradient_spans(&msg.text, dim)),
+        MessageOrigin::UserCommand => {
+            let mut style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+            if dim { style = style.add_modifier(Modifier::DIM); }
+            Line::from(Span::styled(msg.text.clone(), style))
+        }
+        _ => {
+            let mut style = Style::default().fg(emotion_color(msg.emotion));
+            if dim { style = style.add_modifier(Modifier::DIM); }
+            Line::from(Span::styled(msg.text.clone(), style))
+        }
+    }
+}
+
+fn line_display_rows(line: &Line<'_>, available_width: u16) -> u16 {
+    let mut width = 0usize;
+    for span in &line.spans {
+        width += span.content.width();
+    }
+    let aw = available_width.max(1) as usize;
+    let rows = if width == 0 { 1 } else { (width + aw - 1) / aw };
+    rows as u16
 }
 
 pub fn run_loop<F, MapEmo>(
@@ -70,16 +139,16 @@ where
                     state.pending_llm = state.pending_llm.saturating_sub(1);
                     state.typing = state.pending_llm > 0; // keep spinner if other LLMs pending
                     state.mood = map_emotion(&emotion);
-                    state.messages.push(Message { text, emotion: state.mood });
+                    state.messages.push(Message { text, emotion: state.mood, origin: MessageOrigin::Llm });
                 }
                 UiEvent::Stdout(line) => {
-                    state.messages.push(Message { text: line, emotion: Emotion::Neutral });
+                    state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Stdout });
                 }
                 UiEvent::Stderr(line) => {
-                    state.messages.push(Message { text: line, emotion: Emotion::Alert });
+                    state.messages.push(Message { text: line, emotion: Emotion::Alert, origin: MessageOrigin::Stderr });
                 }
                 UiEvent::Status(line) => {
-                    state.messages.push(Message { text: line, emotion: Emotion::Neutral });
+                    state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Status });
                 }
             }
         }
@@ -103,82 +172,48 @@ where
             // Messages: latest conversation first (top), older history below
             let mut lines: Vec<Line> = Vec::with_capacity(state.messages.len() + 2);
 
-            // Identify the start of the most recent command group by the echoed "$ " prefix
+            // Identify the start of the most recent command group by origin
             let latest_cmd_start = state
                 .messages
                 .iter()
-                .rposition(|m| m.text.starts_with("$ "));
+                .rposition(|m| matches!(m.origin, MessageOrigin::UserCommand));
 
-            // Render current group first (top) so newest is visible immediately
-            let mut latest_len: usize = 0;
+            // Render older history first (top), then a separator, then latest group (bottom)
             if let Some(idx) = latest_cmd_start {
+                let has_prev_command = idx > 0 && state.messages[..idx]
+                    .iter()
+                    .any(|m| matches!(m.origin, MessageOrigin::UserCommand));
+                if has_prev_command {
+                    for m in &state.messages[..idx] {
+                        lines.push(render_message_line(m, true));
+                    }
+                    lines.push(Line::from(Span::styled("──────── latest ────────", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD))));
+                }
+
                 // Latest group (chronological, not dimmed)
                 for m in &state.messages[idx..] {
-                    let mut style = match m.emotion {
-                        Emotion::Neutral => Style::default().fg(Color::Gray),
-                        Emotion::Happy => Style::default().fg(Color::Green),
-                        Emotion::Sad    => Style::default().fg(Color::Blue),
-                        Emotion::Alert  => Style::default().fg(Color::Red),
-                    };
-                    if m.text.starts_with("$ ") {
-                        style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
-                    }
-                    lines.push(Line::from(Span::styled(m.text.clone(), style)));
-                    latest_len += 1;
+                    lines.push(render_message_line(m, false));
                 }
                 if state.typing {
                     let dots = ["·  ", "·· ", "···"][(frame as usize / 10) % 3];
                     lines.push(Line::from(Span::styled(format!("thinking {}", dots), Style::default().fg(Color::DarkGray))));
-                    latest_len += 1;
-                }
-
-                // Separator + older history only if there is a previous command
-                let has_prev_command = idx > 0 && state.messages[..idx]
-                    .iter()
-                    .any(|m| m.text.starts_with("$ "));
-                if has_prev_command {
-                    // Separator before older history
-                    lines.push(Line::from(Span::styled("──────── previous ────────", Style::default().fg(Color::DarkGray))));
-
-                    // Older history (newest-first), dimmed
-                    for m in state.messages[..idx].iter().rev() {
-                        let mut style = match m.emotion {
-                            Emotion::Neutral => Style::default().fg(Color::Gray),
-                            Emotion::Happy => Style::default().fg(Color::Green),
-                            Emotion::Sad    => Style::default().fg(Color::Blue),
-                            Emotion::Alert  => Style::default().fg(Color::Red),
-                        }.add_modifier(Modifier::DIM);
-                        if m.text.starts_with("$ ") {
-                            style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::DIM);
-                        }
-                        lines.push(Line::from(Span::styled(m.text.clone(), style)));
-                    }
                 }
             } else {
                 // No commands yet: default to newest-first view
-                for m in state.messages.iter() {
-                    let mut style = match m.emotion {
-                        Emotion::Neutral => Style::default().fg(Color::Gray),
-                        Emotion::Happy => Style::default().fg(Color::Green),
-                        Emotion::Sad    => Style::default().fg(Color::Blue),
-                        Emotion::Alert  => Style::default().fg(Color::Red),
-                    };
-                    if m.text.starts_with("$ ") {
-                        style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
-                    }
-                    lines.push(Line::from(Span::styled(m.text.clone(), style)));
-                }
+                for m in state.messages.iter() { lines.push(render_message_line(m, false)); }
                 if state.typing {
                     let dots = ["·  ", "·· ", "···"][(frame as usize / 10) % 3];
                     lines.push(Line::from(Span::styled(format!("thinking {}", dots), Style::default().fg(Color::DarkGray))));
                 }
             }
-            // Auto-anchor to the bottom of latest group; Up/PageUp scroll upwards into history
-            let total_lines = lines.len() as u16;
+            // Bottom-anchored scrolling across entire buffer based on wrapped rows
+            let available_width = chunks[1].width.saturating_sub(2); // minus borders
+            let mut total_rows: u16 = 0;
+            for line in &lines { total_rows = total_rows.saturating_add(line_display_rows(line, available_width)); }
             let content_height = chunks[1].height.saturating_sub(2); // minus borders
-            let latest_len_u16 = (latest_len as u16).min(total_lines);
-            let base_from_top = latest_len_u16.saturating_sub(content_height);
-            let effective_from_top = base_from_top.saturating_sub(state.scroll);
+            let base_from_top = total_rows.saturating_sub(content_height);
+            let clamped_scroll = state.scroll.min(base_from_top);
+            let effective_from_top = base_from_top.saturating_sub(clamped_scroll);
 
             let dialog = Paragraph::new(lines)
                 .wrap(Wrap { trim: true })
@@ -212,7 +247,7 @@ where
                     KeyCode::Enter => {
                         let line = std::mem::take(&mut state.input);
                         // Echo user command and show spinner
-                        state.messages.push(Message { text: format!("$ {}", line), emotion: Emotion::Neutral });
+                        state.messages.push(Message { text: format!("$ {}", line), emotion: Emotion::Neutral, origin: MessageOrigin::UserCommand });
                         state.typing = true;
                         state.pending_llm = state.pending_llm.saturating_add(1);
                         state.scroll = 0; // anchor to latest group bottom

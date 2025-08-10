@@ -1246,6 +1246,7 @@ dependencies = [
  "symspell",
  "thiserror",
  "tokio",
+ "unicode-width",
 ]
 
 [[package]]
