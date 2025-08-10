@@ -68,34 +68,37 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant U as 👤 User
-    participant C as 🦀 Rust CLI
-    participant A as 🐍 FastAPI Server
-    participant G as 🧠 Gemini API
+    participant CLI as 🦀 Rust CLI
+    participant API as 🐍 FastAPI
+    participant LLM as 🧠 Gemini
     
-    rect rgb(240, 248, 255)
-        Note over U,G: Command Execution & Analysis Flow
-        
-        U->>C: Enter command or query
-        C->>C: Parse input & validate
-        
-        alt Shell Command
-            C->>C: Execute shell command
-            C->>A: POST /route - Send output for analysis
-            A->>G: Request command analysis
-            G-->>A: Analysis response
-            A-->>C: Formatted analysis
-            C->>U: Display command output + AI insights
-        else Direct Query
-            C->>A: POST /query - Send question + history
-            A->>G: Process query with context
-            G-->>A: AI response
-            A-->>C: JSON response
-            C->>U: Display AI answer
-        end
-        
-        C->>A: Update conversation history
-        A->>A: Store context for future queries
+    autonumber
+    
+    Note over U,LLM: SoulCLI Interaction Flow
+    
+    U->>+CLI: Command Input
+    CLI->>CLI: Parse & Validate
+    
+    alt Shell Command
+        CLI->>CLI: Execute Command
+        CLI->>+API: POST /route
+        Note right of API: Analyze Output
+        API->>+LLM: Analysis Request
+        LLM-->>-API: AI Insights
+        API-->>-CLI: Structured Response
+        CLI->>U: Output + Insights
+    else AI Query
+        CLI->>+API: POST /query
+        Note right of API: Process Query
+        API->>+LLM: Context + Question
+        LLM-->>-API: AI Response
+        API-->>-CLI: Formatted Answer
+        CLI->>-U: AI Response
     end
+    
+    Note over CLI,API: Context Learning
+    CLI->>API: Update History
+    API->>API: Store Context
 ```
 
 ### Technical Stack Details
