@@ -1,89 +1,162 @@
-# SoulCLI - A Terminal with a Soul
+# SoulCLI - A Terminal with a Soul 🧠
 
-SoulCLI is a command-line interface that combines the power of a traditional shell with the intelligence of a large language model. It's designed to be a helpful and empathetic companion for developers, providing assistance with shell commands, answering questions, and even offering a bit of encouragement.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust Version](https://img.shields.io/badge/rust-1.78%2B-orange.svg)](https://www.rust-lang.org/)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-## Features
+**SoulCLI is a next-generation command-line interface that fuses the robustness of a traditional shell with the cognitive power of large language models. It's engineered to be an intelligent and empathetic partner for developers, offering contextual assistance, command analysis, and a touch of personality.**
 
-*   **Interactive Shell**: A fully functional shell that can execute any command.
-*   **LLM Integration**: Seamlessly integrated with a large language model to provide context-aware help and suggestions.
-*   **Command Analysis**: Get explanations and suggestions for shell command outputs.
-*   **Smart History**: A history that learns from your commands and provides better suggestions over time.
-*   **Autocorrection**: Automatically corrects common typos in shell commands.
-*   **Emotional Awareness**: The CLI has a "mood" that reflects the nature of the conversation.
+## 🚀 Features
 
-## Project Structure
+*   **Interactive TUI**: A feature-rich terminal user interface built with Rust's `ratatui` and `crossterm`.
+*   **LLM-Powered Assistance**: Leverages the Gemini API to provide intelligent suggestions, command explanations, and answers to your questions.
+*   **Asynchronous Architecture**: Built with `tokio`, ensuring a non-blocking and responsive user experience.
+*   **RESTful API**: A `fastapi` backend that serves the LLM's intelligence to the CLI.
+*   **Dynamic Command Analysis**: Automatically get insights into the output of your shell commands.
+*   **Smart History & Autocorrection**: A persistent history that learns from your usage and corrects common typos.
+*   **Emotional Engine**: A unique "mood" system that reflects the tone of the interaction.
 
-The project is a monorepo with two main components:
+## 🏛️ Architecture
 
-*   `rust_cli/`: A Rust application that implements the command-line interface. It uses `crossterm` and `ratatui` to create the terminal UI.
-*   `python_api/`: A Python application that provides an API for the LLM. It uses `fastapi` and communicates with the Gemini API.
+SoulCLI is composed of two main services that communicate over HTTP:
+
+1.  **Rust CLI (Frontend)**: The user-facing application that you interact with in your terminal.
+2.  **Python API (Backend)**: A `fastapi` server that acts as a bridge to the Gemini LLM.
+
+Here's a diagram illustrating the flow of information:
 
 ```
-/
-├── python_api/         # Python FastAPI server for LLM interaction
-│   ├── app.py          # Main FastAPI application
-│   ├── llm_client.py   # Client for the Gemini API
-│   └── requirements.txt# Python dependencies
-├── rust_cli/           # Rust CLI application
-│   ├── src/
-│   │   ├── main.rs     # Main application entry point
-│   │   └── ...
-│   └── Cargo.toml      # Rust dependencies
-├── .gitignore          # Files to ignore in git
-└── run.sh              # Startup script
++--------------------------------+
+|      User's Terminal           |
++--------------------------------+
+             ^
+             | (crossterm events)
+             v
++--------------------------------+      HTTP Request      +--------------------------------+
+|      Rust CLI (SoulShell)      |---------------------->|      Python API (FastAPI)      |
+|                                |                      |                                |
+| - ratatui TUI                  |      (JSON)          | - uvicorn server               |
+| - tokio for async              |                      | - pydantic models              |
+| - Command execution            |<----------------------| - Gemini client                |
++--------------------------------+      HTTP Response     +--------------------------------+
+                                        (JSON)                       ^
+                                                                     | (API call)
+                                                                     v
+                                                          +----------------------+
+                                                          |   Google Gemini API  |
+                                                          +----------------------+
 ```
 
-## Prerequisites
+## 🛠️ Technical Deep Dive
 
-To run this project, you will need:
+### Rust CLI
 
-*   [Rust](https://www.rust-lang.org/tools/install) (latest stable version)
-*   [Python](https://www.python.org/downloads/) (3.9 or higher)
+The CLI is built with some of the most popular and powerful libraries in the Rust ecosystem:
+
+*   **[ratatui](https://ratatui.rs/)**: A modern library for building terminal user interfaces.
+*   **[crossterm](https://github.com/crossterm-rs/crossterm)**: A pure-rust, terminal manipulation library.
+*   **[tokio](https://tokio.rs/)**: An asynchronous runtime for Rust, used to handle user input, command execution, and API calls concurrently.
+
+### Python API
+
+The backend is a lightweight and high-performance `fastapi` application:
+
+*   **[fastapi](https://fastapi.tiangolo.com/)**: A modern, fast (high-performance) web framework for building APIs with Python 3.7+.
+*   **[uvicorn](https://www.uvicorn.org/)**: A lightning-fast ASGI server, used to run the FastAPI application.
+*   **[pydantic](https://docs.pydantic.dev/)**: Data validation and settings management using python type annotations.
+*   **[python-dotenv](https://github.com/theskumar/python-dotenv)**: Reads key-value pairs from a `.env` file and can set them as environment variables.
+
+## ⚙️ Installation and Setup
+
+Follow these steps to get SoulCLI up and running on your local machine.
+
+### 1. Prerequisites
+
+Make sure you have the following installed:
+
+*   [Rust](https://www.rust-lang.org/tools/install) (v1.78 or later)
+*   [Python](https://www.python.org/downloads/) (v3.9 or later)
 *   A [Gemini API Key](https://ai.google.dev/)
 
-## Getting Started
+### 2. Clone the Repository
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository_url>
-    cd soulcli
-    ```
+```bash
+git clone <repository_url>
+cd soulcli
+```
 
-2.  **Set up the Python environment:**
-    ```bash
-    cd python_api
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    cd ..
-    ```
+### 3. Set up the Python Backend
 
-3.  **Create the `.env` file:**
-    Create a file named `.env` in the `python_api` directory and add your Gemini API key to it:
-    ```
-    GEMINI_API_KEY=your_api_key_here
-    ```
+```bash
+cd python_api
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cd ..
+```
 
-4.  **Run the application:**
-    The project comes with a startup script that simplifies the process of running both the Rust CLI and the Python API server.
-    ```bash
-    ./run.sh
-    ```
-    This will start the Python server in the background and the Rust CLI in the foreground.
+### 4. Configure your API Key
 
-## How to Use
+Create a `.env` file in the `python_api` directory:
 
-Once the application is running, you can interact with it like a regular shell. You can type commands and press `Enter` to execute them.
+```bash
+touch python_api/.env
+```
 
-*   **Ask questions**: You can ask questions directly in the shell. The LLM will try to answer them.
-*   **Get help with commands**: After running a command, the LLM will provide an analysis of the output.
-*   **Cancel commands**: Press `x` to cancel a running command.
-*   **Exit**: Press `Esc` to exit the CLI.
+Open the file and add your Gemini API key:
 
-## Contributing
+```
+GEMINI_API_KEY="your_super_secret_api_key"
+```
 
-Contributions are welcome! Please feel free to open an issue or submit a pull request.
+### 5. Launch the Application
 
-## License
+We've included a handy script to start both the backend and frontend with a single command:
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+This will start the Python API server in the background and the Rust CLI in the foreground.
+
+## 📖 Usage
+
+Once SoulCLI is running, you can use it like a standard shell. Here are some of the things you can do:
+
+*   **Run any shell command**: `ls -l`, `git status`, `docker ps`, etc.
+*   **Ask a question**: `what is the capital of France?`
+*   **Get an explanation of the previous command's output**: `explain the output of the last command`
+*   **Cancel a running command**: Press the `x` key.
+*   **Exit SoulCLI**: Press the `Esc` key.
+
+## 🌐 API Endpoints
+
+The Python API server exposes the following endpoints:
+
+*   `POST /query`: Takes a prompt and history, and returns a response from the LLM.
+*   `POST /route`: A prompt router that determines the mode and frames the prompt for the LLM.
+*   `GET /health`: A health check endpoint.
+
+## 🤝 Contributing
+
+We welcome contributions from the community! If you'd like to contribute, please follow these steps:
+
+1.  Fork the repository.
+2.  Create a new branch for your feature or bug fix.
+3.  Make your changes and commit them with a clear and descriptive message.
+4.  Push your changes to your fork.
+5.  Open a pull request to the `main` branch of this repository.
+
+## 🗺️ Roadmap
+
+Here are some of the features we're planning to add in the future:
+
+*   [ ] Support for more LLMs (e.g., OpenAI, Anthropic).
+*   [ ] Customizable themes and color schemes.
+*   [ ] Plugin system for extending the CLI's functionality.
+*   [ ] More advanced command analysis and suggestions.
+
+## 📜 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
