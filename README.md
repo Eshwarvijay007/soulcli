@@ -30,26 +30,26 @@ SoulCLI is composed of two main services that communicate over HTTP:
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        User[👤 User Terminal]
+        User["👤 User Terminal"]
     end
     
     subgraph "Frontend Layer"
-        CLI[🦀 Rust CLI - SoulShell<br/>• ratatui TUI<br/>• crossterm events<br/>• tokio async runtime<br/>• Command execution]
+        CLI["🦀 Rust CLI - SoulShell<br/>• ratatui TUI<br/>• crossterm events<br/>• tokio async runtime<br/>• Command execution"]
     end
     
     subgraph "Backend Layer"
-        API[🐍 Python FastAPI Server<br/>• uvicorn ASGI server<br/>• pydantic models<br/>• RESTful endpoints<br/>• Request routing]
+        API["🐍 Python FastAPI Server<br/>• uvicorn ASGI server<br/>• pydantic models<br/>• RESTful endpoints<br/>• Request routing"]
     end
     
     subgraph "AI Layer"
-        Gemini[🧠 Google Gemini API<br/>• Natural language processing<br/>• Command analysis<br/>• Intelligent responses]
+        Gemini["🧠 Google Gemini API<br/>• Natural language processing<br/>• Command analysis<br/>• Intelligent responses"]
     end
     
     User -->|Terminal Commands| CLI
-    CLI -->|HTTP Requests<br/>(JSON)| API
+    CLI -->|HTTP Requests JSON| API
     API -->|API Calls| Gemini
     Gemini -->|AI Responses| API
-    API -->|HTTP Responses<br/>(JSON)| CLI
+    API -->|HTTP Responses JSON| CLI
     CLI -->|Formatted Output| User
     
     classDef userLayer fill:#e8f4fd,stroke:#1f77b4,stroke-width:2px
@@ -103,22 +103,22 @@ sequenceDiagram
 ```mermaid
 graph LR
     subgraph "🦀 Rust Frontend"
-        R1[ratatui<br/>Terminal UI Framework]
-        R2[crossterm<br/>Cross-platform Terminal]
-        R3[tokio<br/>Async Runtime]
-        R4[reqwest<br/>HTTP Client]
+        R1["ratatui<br/>Terminal UI Framework"]
+        R2["crossterm<br/>Cross-platform Terminal"]
+        R3["tokio<br/>Async Runtime"]
+        R4["reqwest<br/>HTTP Client"]
     end
     
     subgraph "🐍 Python Backend"  
-        P1[fastapi<br/>Web Framework]
-        P2[uvicorn<br/>ASGI Server]
-        P3[pydantic<br/>Data Validation]
-        P4[python-dotenv<br/>Environment Config]
+        P1["fastapi<br/>Web Framework"]
+        P2["uvicorn<br/>ASGI Server"]
+        P3["pydantic<br/>Data Validation"]
+        P4["python-dotenv<br/>Environment Config"]
     end
     
     subgraph "🌐 External Services"
-        E1[Google Gemini API<br/>Large Language Model]
-        E2[System Shell<br/>Command Execution]
+        E1["Google Gemini API<br/>Large Language Model"]
+        E2["System Shell<br/>Command Execution"]
     end
     
     R1 --> R3
@@ -239,7 +239,7 @@ We welcome contributions from the community! If you'd like to contribute, please
 2.  Create a new branch for your feature or bug fix.
 3.  Make your changes and commit them with a clear and descriptive message.
 4.  Push your changes to your fork.
-5.  Open a pull request to the `master` branch of this repository.
+5.  Open a pull request to the `main` branch of this repository.
 
 ## 🗺️ Roadmap
 
