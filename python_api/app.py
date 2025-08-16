@@ -48,50 +48,16 @@ async def query_llm(q: Query):
     emotion = tag_emotion(text)
     return {"text": text, "emotion": emotion}
 
-@app.post("/route", response_model=RouteOut)
-async def route(q: RouteIn):
-    """LLM-powered prompt router: returns mode, framed prompt, and a short note."""
-    sys_instructions = (
-        "You are a prompt router for a developer terminal assistant.\n"
-        "Decide a mode (one of: cli_help, philosophy, emotional, concise).\n"
-        "Then create a 'framed' prompt that instructs the assistant how to answer.\n"
-        "Rules by mode:\n"
-        "- cli_help: exact commands, concise (<= 2 lines), prefer one-liners, numbered steps if needed.\n"
-        "- philosophy: thoughtful yet succinct (<= 5 lines).\n"
-        "- emotional: short vivid response (6–10 lines), empathetic tone.\n"
-        "- concise: answer in <= 2 lines.\n"
-        "Also detect funny CLI typos (e.g., 'gti' -> 'git') and bake a gentle, humorous correction into the framed prompt so the answer includes the corrected command and a playful quip.\n"
-        "Return STRICT JSON with keys: mode, framed, note. No extra text."
-    )
+class AnalyzeIn(BaseModel):
+    command: str
+    output: str
 
-    history_lines = "\n".join(q.history[-8:])
-    router_prompt = (
-        f"[SYSTEM]\n{sys_instructions}\n\n"
-        f"[HISTORY]\n{history_lines}\n\n"
-        f"[USER_RAW]\n{q.input}"
-    )
-
-    result = await client.chat(router_prompt, [])
-    text = (result.get("text") or "").strip()
-    # Try to strip code fences if the model wrapped JSON
-    if text.startswith("```"):
-        text = text.strip('`')
-        # remove possible language tag
-        if "\n" in text:
-            text = text.split("\n", 1)[1]
-
-    try:
-        data = json.loads(text)
-        mode = str(data.get("mode", "concise"))
-        framed = str(data.get("framed", q.input))
-        note = str(data.get("note", ""))
-    except Exception:
-        # Fallback: default concise
-        mode = "concise"
-        framed = f"[SYSTEM]\nAnswer succinctly in <= 2 lines.\n\n[USER]\n{q.input}"
-        note = ""
-
-    return {"mode": mode, "framed": framed, "note": note}
+@app.post("/analyze")
+async def analyze(q: AnalyzeIn):
+    """Analyzes the output of a command and returns a response."""
+    from .router import route_request
+    analysis = route_request(q.command, q.output)
+    return {"text": analysis}
 
 if __name__ == "__main__":
     import uvicorn

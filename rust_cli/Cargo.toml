@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+regex = "1"
+textwrap = "0.16"
 anyhow = "1.0"
 directories = "5.0"
 strsim = "0.11"

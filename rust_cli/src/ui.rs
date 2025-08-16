@@ -120,6 +120,155 @@ fn line_display_rows(line: &Line<'_>, available_width: u16) -> u16 {
     rows as u16
 }
 
+/* -------------------- minimal LLM markdown cleaner -------------------- */
+
+/// Very small markdown cleaner for LLM text.
+/// - strips **bold**, *italics*, __bold__, _italics_, `inline code`
+/// - flattens headings like "# Title" -> "Title"
+/// - converts [text](url) -> "text (url)"
+/// - preserves fenced code blocks ``` ... ``` by indenting them
+/// - inserts a newline after "Next steps:" / "Summary:" / "Tips:"
+fn clean_llm_text(input: &str) -> String {
+    // normalize newlines
+    let mut s = input.replace("\r\n", "\n");
+
+    // 1) preserve fenced code blocks by indenting and removing the fences
+    let mut out = String::with_capacity(s.len());
+    let mut i = 0usize;
+    let bytes = s.as_bytes();
+    let mut in_fence = false;
+
+    while i < bytes.len() {
+        if !in_fence && i + 3 <= bytes.len() && &s[i..i + 3] == "```" {
+            in_fence = true;
+            i += 3;
+            while i < bytes.len() && bytes[i] != b'\n' { i += 1; }
+            if i < bytes.len() && bytes[i] == b'\n' { i += 1; }
+            out.push('\n');
+            continue;
+        }
+        if in_fence && i + 3 <= bytes.len() && &s[i..i + 3] == "```" {
+            in_fence = false;
+            i += 3;
+            if i < bytes.len() && bytes[i] == b'\n' { i += 1; }
+            out.push('\n');
+            continue;
+        }
+        if in_fence {
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'\n' { i += 1; }
+            out.push_str("    ");
+            out.push_str(&s[start..i]);
+            if i < bytes.len() && bytes[i] == b'\n' { out.push('\n'); i += 1; }
+            continue;
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+
+    s = out;
+
+    // 2) headings: strip leading '#' and spaces on each line
+    let mut cleaned = String::with_capacity(s.len());
+    for line in s.lines() {
+        let mut l = line;
+        let mut hashes = 0;
+        for ch in l.chars() {
+            if ch == '#' && hashes < 6 { hashes += 1; } else { break; }
+        }
+        if hashes > 0 {
+            l = l.trim_start_matches('#').trim_start();
+        }
+        cleaned.push_str(l);
+        cleaned.push('\n');
+    }
+    s = cleaned;
+
+    // 3) inline code: remove backticks
+    s = s.replace('`', "");
+
+    // 4) bold/italics markers
+    s = s.replace("**", "");
+    s = s.replace("__", "");
+    s = s.replace('*', "");
+    s = s.replace('_', "");
+
+    // 5) links: [text](url) -> text (url)  (minimal, non-regex)
+    let mut out2 = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '[' {
+            let mut text = String::new();
+            while let Some(&nc) = chars.peek() {
+                chars.next();
+                if nc == ']' { break; }
+                text.push(nc);
+            }
+            if let Some(&'(') = chars.peek() {
+                chars.next();
+                let mut url = String::new();
+                while let Some(&nc) = chars.peek() {
+                    chars.next();
+                    if nc == ')' { break; }
+                    url.push(nc);
+                }
+                out2.push_str(&text);
+                if !url.is_empty() {
+                    out2.push_str(" (");
+                    out2.push_str(&url);
+                    out2.push(')');
+                }
+            } else {
+                out2.push('[');
+                out2.push_str(&text);
+                out2.push(']');
+            }
+        } else {
+            out2.push(c);
+        }
+    }
+    s = out2;
+
+    // 6) newline after common labels
+    for label in ["Next steps:", "NEXT STEPS:", "Summary:", "SUMMARY:", "Tips:", "TIPS:"] {
+        s = s.replace(label, &format!("{label}\n"));
+    }
+
+    // 7) split glued ordered lists like "1. foo 2. bar"
+    let mut last_was_digit_dot = false;
+    let mut out3 = String::with_capacity(s.len());
+    let mut iter = s.chars().peekable();
+    while let Some(ch) = iter.next() {
+        if ch.is_ascii_digit() && matches!(iter.peek(), Some('.')) {
+            if let Some(prev) = out3.chars().last() {
+                if prev != '\n' && prev != ' ' { out3.push('\n'); }
+            }
+            out3.push(ch);
+            last_was_digit_dot = true;
+        } else {
+            out3.push(ch);
+            if last_was_digit_dot && ch == '.' { last_was_digit_dot = false; }
+        }
+    }
+
+    // 8) collapse double spaces (keep newlines)
+    let mut final_s = String::with_capacity(out3.len());
+    let mut prev_space = false;
+    for ch in out3.chars() {
+        if ch == ' ' {
+            if !prev_space { final_s.push(ch); }
+            prev_space = true;
+        } else {
+            final_s.push(ch);
+            prev_space = false;
+        }
+    }
+
+    final_s
+}
+
+/* -------------------- UI loop -------------------- */
+
 pub fn run_loop<F, MapEmo>(
     rx: Receiver<UiEvent>,
     mut on_submit: F,
@@ -145,23 +294,48 @@ where
             match ev {
                 UiEvent::Llm { text, emotion } => {
                     state.pending_llm = state.pending_llm.saturating_sub(1);
-                    state.typing = state.pending_llm > 0; // keep spinner if other LLMs pending
+                    state.typing = state.pending_llm > 0;
                     state.mood = map_emotion(&emotion);
-                    state.messages.push(Message { text, emotion: state.mood, origin: MessageOrigin::Llm, conversation_id: 0 });
+                    let clean = clean_llm_text(&text);
+                    state.messages.push(Message {
+                        text: clean,
+                        emotion: state.mood,
+                        origin: MessageOrigin::Llm,
+                        conversation_id: 0,
+                    });
                 }
+                
+                // 1) streaming chunks: append RAW (no cleaning yet)
                 UiEvent::LlmChunk { id, text } => {
-                    // Append chunk to current LLM message for this conversation, or create it
-                    if let Some(pos) = state.messages.iter().rposition(|m| matches!(m.origin, MessageOrigin::Llm) && m.conversation_id == id) {
+                    if let Some(pos) = state.messages.iter().rposition(|m|
+                        matches!(m.origin, MessageOrigin::Llm) && m.conversation_id == id
+                    ) {
                         state.messages[pos].text.push_str(&text);
                     } else {
-                        state.messages.push(Message { text, emotion: Emotion::Neutral, origin: MessageOrigin::Llm, conversation_id: id });
+                        state.messages.push(Message {
+                            text,
+                            emotion: Emotion::Neutral,
+                            origin: MessageOrigin::Llm,
+                            conversation_id: id,
+                        });
                     }
                 }
-                UiEvent::LlmDone { id: _, emotion } => {
+
+                // 2) stream finished: CLEAN the whole aggregated text once
+                UiEvent::LlmDone { id, emotion } => {
                     state.pending_llm = state.pending_llm.saturating_sub(1);
                     state.typing = state.pending_llm > 0;
                     state.mood = map_emotion(&emotion);
+
+                    if let Some(pos) = state.messages.iter().rposition(|m|
+                        matches!(m.origin, MessageOrigin::Llm) && m.conversation_id == id
+                    ) {
+                        let raw = std::mem::take(&mut state.messages[pos].text);
+                        state.messages[pos].text = clean_llm_text(&raw);
+                        state.messages[pos].emotion = state.mood;
+                    }
                 }
+
                 UiEvent::Stdout(line) => {
                     state.messages.push(Message { text: line, emotion: Emotion::Neutral, origin: MessageOrigin::Stdout, conversation_id: 0 });
                 }
